@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>손글씨 숫자 인식기</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d0d0d;
+  --bg2: #161616;
+  --bg3: #1e1e1e;
+  --bg4: #262626;
+  --border: #2a2a2a;
+  --border2: #383838;
+  --text: #f0f0f0;
+  --text2: #999;
+  --text3: #555;
+  --accent: #e8e8e8;
+  --green: #4ade80;
+  --red: #f87171;
+  --yellow: #fbbf24;
+}
+
+body {
+  font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── SIDEBAR ── */
+.sidebar {
+  width: 200px;
+  min-width: 200px;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 0 1rem;
+  user-select: none;
+}
+
+.app-logo {
+  padding: 0 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.75rem;
+}
+.app-logo .icon {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  margin-bottom: 0.5rem;
+}
+.app-logo h1 { font-size: 13px; font-weight: 500; color: var(--text); }
+.app-logo p  { font-size: 11px; color: var(--text3); margin-top: 2px; }
+
+nav { flex: 1; padding: 0 0.5rem; }
+
+.nav-btn {
+  width: 100%;
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px;
+  border: none; background: transparent;
+  color: var(--text2);
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.12s;
+  text-align: left;
+  margin-bottom: 2px;
+}
+.nav-btn:hover { background: var(--bg3); color: var(--text); }
+.nav-btn.active { background: var(--bg4); color: var(--accent); }
+.nav-btn .nav-icon { font-size: 15px; width: 20px; text-align: center; }
+
+.sidebar-footer {
+  padding: 0 0.5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+
+/* ── MAIN ── */
+.main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  height: 48px; min-height: 48px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 1.5rem;
+  gap: 12px;
+}
+.topbar h2 { font-size: 14px; font-weight: 500; }
+.topbar .sub { font-size: 12px; color: var(--text3); }
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 1.5rem;
+}
+
+/* ── TABS ── */
+.tab { display: none; }
+.tab.active { display: flex; flex-direction: column; height: 100%; }
+
+/* ── CANVAS ── */
+.canvas-wrap {
+  position: relative;
+  display: inline-block;
+}
+canvas {
+  background: #111;
+  border: 1px solid var(--border2);
+  border-radius: 12px;
+  cursor: crosshair;
+  display: block;
+  touch-action: none;
+}
+canvas:hover { border-color: #444; }
+
+.canvas-hint {
+  font-size: 11px; color: var(--text3);
+  margin-top: 8px; text-align: center;
+}
+
+/* ── BUTTONS ── */
+.btn {
+  padding: 9px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border2);
+  background: transparent;
+  color: var(--text2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.btn:hover { border-color: #555; color: var(--text); }
+.btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn.primary {
+  background: var(--accent); color: #0d0d0d;
+  border-color: var(--accent); font-weight: 500;
+}
+.btn.primary:hover { background: #fff; border-color: #fff; }
+.btn.danger  { border-color: #552222; color: var(--red); }
+.btn.danger:hover { background: #1a0a0a; }
+.btn.success { border-color: #1a4a2a; color: var(--green); }
+.btn.success:hover { background: #0a1a0a; }
+
+.btn-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+/* ── RESULT PANEL ── */
+.result-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  min-width: 200px;
+}
+.result-label { font-size: 11px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+.big-num {
+  font-size: 96px; font-weight: 300; line-height: 1;
+  color: var(--accent); min-height: 105px;
+  display: flex; align-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.conf-text { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+/* ── BARS ── */
+.bars { margin-top: 1rem; }
+.bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+.bar-d { font-size: 12px; color: var(--text3); width: 12px; text-align: center; }
+.bar-d.top { color: var(--text); font-weight: 500; }
+.bar-track { flex: 1; height: 3px; background: var(--bg4); border-radius: 99px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 99px; background: var(--border2); transition: width 0.45s cubic-bezier(.4,0,.2,1); }
+.bar-fill.top { background: var(--accent); }
+.bar-pct { font-size: 11px; color: var(--text3); width: 30px; text-align: right; }
+.bar-pct.top { color: var(--text2); }
+
+/* ── STATUS ── */
+.status {
+  font-size: 13px; color: var(--text3);
+  min-height: 20px; margin-top: 0.75rem;
+}
+.status.ok    { color: var(--green); }
+.status.error { color: var(--red); }
+.status.loading { color: var(--text2); }
+
+.spinner {
+  display: inline-block; width: 11px; height: 11px;
+  border: 1.5px solid var(--border2); border-top-color: var(--text2);
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+  vertical-align: middle; margin-right: 6px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── TAB 1: 인식 ── */
+#tab-recognize .layout {
+  display: flex; gap: 2rem; flex-wrap: wrap; flex: 1;
+}
+
+/* ── TAB 2: 연속 인식 ── */
+#tab-sequence .layout {
+  display: flex; gap: 2rem; flex-wrap: wrap; flex: 1;
+}
+.sequence-display {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.seq-label { font-size: 11px; color: var(--text3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.5rem; }
+.seq-number {
+  font-size: 52px; font-weight: 300; letter-spacing: 0.06em;
+  color: var(--accent); min-height: 60px;
+  font-variant-numeric: tabular-nums;
+}
+.seq-number.empty { color: var(--text3); font-size: 28px; }
+.seq-digits { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.seq-digit {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 18px; color: var(--text);
+  font-variant-numeric: tabular-nums;
+  display: flex; align-items: center; gap: 6px;
+}
+.seq-digit .conf-badge { font-size: 10px; color: var(--text3); }
+.seq-digit .del-btn {
+  background: none; border: none; color: var(--text3);
+  cursor: pointer; padding: 0 2px; font-size: 13px;
+  line-height: 1;
+}
+.seq-digit .del-btn:hover { color: var(--red); }
+
+/* ── TAB 3: 테스트 ── */
+#tab-test .layout {
+  display: flex; gap: 2rem; flex-wrap: wrap; flex: 1;
+}
+.test-target {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+.test-target-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.25rem; }
+.test-target-num {
+  font-size: 80px; font-weight: 200; color: var(--accent);
+  line-height: 1; font-variant-numeric: tabular-nums;
+  min-height: 88px; display: flex; align-items: center; justify-content: center;
+}
+.score-board {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.score-row { display: flex; justify-content: space-between; align-items: center; }
+.score-item { text-align: center; }
+.score-val { font-size: 28px; font-weight: 300; color: var(--accent); font-variant-numeric: tabular-nums; }
+.score-lbl { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.score-val.green { color: var(--green); }
+.score-val.red   { color: var(--red); }
+.progress-bar {
+  height: 3px; background: var(--bg4);
+  border-radius: 99px; overflow: hidden; margin-top: 12px;
+}
+.progress-fill {
+  height: 100%; background: var(--accent);
+  border-radius: 99px; transition: width 0.4s ease;
+}
+.result-overlay {
+  position: absolute; inset: 0;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 64px; font-weight: 300;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s;
+}
+.result-overlay.show { opacity: 0.9; pointer-events: all; }
+.result-overlay.correct { background: rgba(10,30,15,0.9); color: var(--green); }
+.result-overlay.wrong   { background: rgba(30,10,10,0.9); color: var(--red); }
+
+/* ── TAB 4: 기록 ── */
+.history-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 1rem;
+}
+.history-stats {
+  display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;
+}
+.stat-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 1.25rem;
+}
+.stat-card .val { font-size: 22px; font-weight: 300; color: var(--accent); }
+.stat-card .lbl { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.history-table { width: 100%; border-collapse: collapse; }
+.history-table th {
+  font-size: 11px; color: var(--text3); text-transform: uppercase;
+  letter-spacing: 0.06em; font-weight: 400;
+  padding: 8px 12px; text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.history-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px; color: var(--text2);
+}
+.history-table tr:hover td { background: var(--bg2); }
+.history-table .digit-cell { font-size: 22px; font-weight: 300; color: var(--accent); width: 50px; }
+.badge {
+  display: inline-block;
+  padding: 2px 8px; border-radius: 99px;
+  font-size: 11px;
+}
+.badge.correct { background: rgba(74,222,128,0.1); color: var(--green); }
+.badge.wrong   { background: rgba(248,113,113,0.1); color: var(--red); }
+.badge.normal  { background: var(--bg3); color: var(--text3); }
+.empty-state {
+  text-align: center; padding: 3rem;
+  color: var(--text3); font-size: 13px;
+}
+
+/* ── TAB 5: 설정 ── */
+.settings-section {
+  max-width: 480px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.settings-section h3 { font-size: 13px; font-weight: 500; margin-bottom: 1rem; }
+.form-row { margin-bottom: 1rem; }
+.form-label { font-size: 12px; color: var(--text3); margin-bottom: 6px; display: block; }
+.form-input {
+  width: 100%; padding: 9px 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 8px; color: var(--text);
+  font-size: 13px; font-family: 'SF Mono', 'Fira Code', monospace;
+}
+.form-input:focus { outline: none; border-color: #555; }
+.form-hint { font-size: 11px; color: var(--text3); margin-top: 5px; }
+.settings-saved { font-size: 12px; color: var(--green); margin-left: 8px; opacity: 0; transition: opacity 0.3s; }
+.settings-saved.show { opacity: 1; }
+
+/* scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg4); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="app-logo">
+    <div class="icon">✏️</div>
+    <h1>숫자 인식기</h1>
+    <p>손글씨 → AI 인식</p>
+  </div>
+  <nav>
+    <button class="nav-btn active" data-tab="recognize">
+      <span class="nav-icon">🔍</span> 인식
+    </button>
+    <button class="nav-btn" data-tab="sequence">
+      <span class="nav-icon">🔢</span> 연속 인식
+    </button>
+    <button class="nav-btn" data-tab="test">
+      <span class="nav-icon">🎯</span> 테스트 모드
+    </button>
+    <button class="nav-btn" data-tab="history">
+      <span class="nav-icon">📋</span> 기록
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <button class="nav-btn" data-tab="settings">
+      <span class="nav-icon">⚙️</span> 설정
+    </button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <h2 id="topbar-title">인식</h2>
+    <span class="sub" id="topbar-sub">손글씨로 숫자를 그려서 AI로 인식합니다</span>
+  </div>
+  <div class="content">
+
+    <!-- TAB 1: 인식 -->
+    <div class="tab active" id="tab-recognize">
+      <div class="layout">
+        <div>
+          <div class="canvas-wrap">
+            <canvas id="canvas-r" width="280" height="280"></canvas>
+            <div class="result-overlay" id="overlay-r"></div>
+          </div>
+          <div class="canvas-hint">마우스 또는 터치로 숫자를 크게 그리세요</div>
+          <div class="btn-row">
+            <button class="btn primary" id="btn-r-recognize">인식하기</button>
+            <button class="btn" id="btn-r-clear">지우기</button>
+          </div>
+        </div>
+        <div class="result-panel" style="flex:1; min-width:200px;">
+          <div class="result-label">인식 결과</div>
+          <div class="big-num" id="result-r-num">—</div>
+          <div class="conf-text" id="result-r-conf"></div>
+          <div class="bars" id="result-r-bars"></div>
+          <div class="status" id="status-r">숫자를 그린 후 [인식하기]를 누르세요.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: 연속 인식 -->
+    <div class="tab" id="tab-sequence">
+      <div class="sequence-display">
+        <div class="seq-label">인식된 숫자열</div>
+        <div class="seq-number empty" id="seq-display">아직 없음</div>
+        <div class="seq-digits" id="seq-digits"></div>
+      </div>
+      <div class="layout">
+        <div>
+          <div class="canvas-wrap">
+            <canvas id="canvas-s" width="260" height="260"></canvas>
+          </div>
+          <div class="canvas-hint">숫자 하나를 그리고 [추가]를 누르세요</div>
+          <div class="btn-row">
+            <button class="btn primary" id="btn-s-add">추가하기</button>
+            <button class="btn" id="btn-s-clear-canvas">캔버스 지우기</button>
+            <button class="btn danger" id="btn-s-reset">숫자열 초기화</button>
+          </div>
+          <div class="status" id="status-s">숫자를 그리고 [추가하기]를 누르세요.</div>
+        </div>
+        <div style="flex:1; min-width:180px;">
+          <div class="result-panel">
+            <div class="result-label">최근 인식</div>
+            <div class="big-num" id="result-s-num">—</div>
+            <div class="conf-text" id="result-s-conf"></div>
+          </div>
+          <div style="margin-top:12px;">
+            <button class="btn success" id="btn-s-save" style="width:100%">기록에 저장</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: 테스트 모드 -->
+    <div class="tab" id="tab-test">
+      <div id="test-idle">
+        <p style="color:var(--text2); margin-bottom:1.5rem; font-size:14px;">
+          AI가 제시한 숫자를 손글씨로 그리면 인식률을 측정합니다. 총 10문제.
+        </p>
+        <button class="btn primary" id="btn-test-start" style="font-size:15px; padding:12px 32px;">테스트 시작</button>
+      </div>
+      <div id="test-active" style="display:none;">
+        <div class="score-board">
+          <div class="score-row">
+            <div class="score-item">
+              <div class="score-val" id="test-q">0</div>
+              <div class="score-lbl">문제</div>
+            </div>
+            <div class="score-item">
+              <div class="score-val green" id="test-correct">0</div>
+              <div class="score-lbl">정답</div>
+            </div>
+            <div class="score-item">
+              <div class="score-val red" id="test-wrong">0</div>
+              <div class="score-lbl">오답</div>
+            </div>
+            <div class="score-item">
+              <div class="score-val" id="test-pct">—</div>
+              <div class="score-lbl">정확도</div>
+            </div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="test-progress" style="width:0%"></div>
+          </div>
+        </div>
+        <div class="layout">
+          <div>
+            <div class="test-target">
+              <div class="test-target-label">이 숫자를 그리세요</div>
+              <div class="test-target-num" id="test-target-num">?</div>
+            </div>
+            <div class="canvas-wrap">
+              <canvas id="canvas-t" width="260" height="260"></canvas>
+              <div class="result-overlay" id="overlay-t"></div>
+            </div>
+            <div class="canvas-hint">숫자를 그리고 [확인]을 누르세요</div>
+            <div class="btn-row">
+              <button class="btn primary" id="btn-t-check">확인</button>
+              <button class="btn" id="btn-t-clear">지우기</button>
+              <button class="btn danger" id="btn-t-stop">중단</button>
+            </div>
+            <div class="status" id="status-t"></div>
+          </div>
+          <div style="flex:1; min-width:180px;">
+            <div class="result-panel">
+              <div class="result-label">AI 인식</div>
+              <div class="big-num" id="result-t-num">—</div>
+              <div class="conf-text" id="result-t-conf"></div>
+              <div class="bars" id="result-t-bars"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="test-done" style="display:none; text-align:center; padding:2rem 0;">
+        <div style="font-size:56px; font-weight:200; color:var(--accent); margin-bottom:0.5rem;" id="final-score-num"></div>
+        <div style="font-size:14px; color:var(--text2); margin-bottom:0.25rem;" id="final-score-sub"></div>
+        <div style="font-size:12px; color:var(--text3); margin-bottom:2rem;" id="final-score-detail"></div>
+        <button class="btn primary" id="btn-test-again">다시 테스트</button>
+      </div>
+    </div>
+
+    <!-- TAB 4: 기록 -->
+    <div class="tab" id="tab-history">
+      <div class="history-header">
+        <div class="history-stats" id="history-stats"></div>
+        <button class="btn danger" id="btn-clear-history">기록 삭제</button>
+      </div>
+      <div id="history-body"></div>
+    </div>
+
+    <!-- TAB 5: 설정 -->
+    <div class="tab" id="tab-settings">
+      <div class="settings-section">
+        <h3>Anthropic API 키</h3>
+        <div class="form-row">
+          <label class="form-label">API Key</label>
+          <input type="password" class="form-input" id="input-api-key" placeholder="sk-ant-..." autocomplete="off">
+          <div class="form-hint">키는 로컬 파일에만 저장됩니다. 외부로 전송되지 않습니다.</div>
+        </div>
+        <div style="display:flex; align-items:center;">
+          <button class="btn primary" id="btn-save-key">저장</button>
+          <span class="settings-saved" id="settings-saved">✓ 저장됨</span>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h3>앱 정보</h3>
+        <p style="font-size:13px; color:var(--text3); line-height:1.8;">
+          손글씨 숫자 인식기 v1.0.0<br>
+          Claude claude-sonnet-4-20250514 Vision API 사용<br>
+          기록은 로컬에 JSON 파일로 저장됩니다.
+        </p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── 유틸 ────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+let apiKey = '';
+let history = [];
+
+const TAB_META = {
+  recognize: { title: '인식',       sub: '손글씨로 숫자를 그려서 AI로 인식합니다' },
+  sequence:  { title: '연속 인식',   sub: '여러 숫자를 연속으로 그려 긴 숫자를 만듭니다' },
+  test:      { title: '테스트 모드', sub: '제시된 숫자를 그려 AI 인식 정확도를 측정합니다' },
+  history:   { title: '기록',        sub: '인식 기록을 확인합니다' },
+  settings:  { title: '설정',        sub: 'API 키 및 앱 설정' }
+};
+
+// ── 탭 전환 ─────────────────────────────────────────────────────────
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.id === 'tab-' + tab));
+    const meta = TAB_META[tab] || {};
+    $('topbar-title').textContent = meta.title || '';
+    $('topbar-sub').textContent   = meta.sub || '';
+    if (tab === 'history') renderHistory();
+    if (tab === 'settings') $('input-api-key').value = apiKey;
+  });
+});
+
+// ── 캔버스 공통 ─────────────────────────────────────────────────────
+function initCanvas(id) {
+  const canvas = $(id);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#111'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 20; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  let drawing = false, lx = 0, ly = 0;
+
+  function pos(e) {
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return {
+      x: (t.clientX - r.left) * (canvas.width / r.width),
+      y: (t.clientY - r.top)  * (canvas.height / r.height)
+    };
+  }
+  function dot(p) { ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI*2); ctx.fillStyle='#fff'; ctx.fill(); }
+  function stroke(x1,y1,x2,y2) { ctx.beginPath(); ctx.strokeStyle='#fff'; ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); }
+
+  canvas.addEventListener('mousedown', e => { drawing=true; const p=pos(e); lx=p.x; ly=p.y; dot(p); });
+  canvas.addEventListener('mousemove', e => { if(!drawing) return; const p=pos(e); stroke(lx,ly,p.x,p.y); lx=p.x; ly=p.y; });
+  canvas.addEventListener('mouseup',   () => drawing=false);
+  canvas.addEventListener('mouseleave',() => drawing=false);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; const p=pos(e); lx=p.x; ly=p.y; dot(p); }, {passive:false});
+  canvas.addEventListener('touchmove',  e => { e.preventDefault(); if(!drawing) return; const p=pos(e); stroke(lx,ly,p.x,p.y); lx=p.x; ly=p.y; }, {passive:false});
+  canvas.addEventListener('touchend',   () => drawing=false);
+
+  return {
+    canvas, ctx,
+    clear: () => { ctx.fillStyle='#111'; ctx.fillRect(0,0,canvas.width,canvas.height); },
+    getBase64: () => canvas.toDataURL('image/png').split(',')[1]
+  };
+}
+
+const canvasR = initCanvas('canvas-r');
+const canvasS = initCanvas('canvas-s');
+const canvasT = initCanvas('canvas-t');
+
+// ── API 호출 ─────────────────────────────────────────────────────────
+async function recognize(base64) {
+  if (!apiKey) throw new Error('API 키가 설정되지 않았습니다. 설정 탭에서 입력하세요.');
+  return await window.api.recognize({ base64, apiKey });
+}
+
+// ── 바 차트 렌더 ──────────────────────────────────────────────────────
+function renderBars(containerId, result) {
+  const el = $(containerId);
+  if (!el) return;
+  const s = result.scores || {};
+  let html = '';
+  for (let d = 0; d <= 9; d++) {
+    const pct = Math.round((s[String(d)]||0)*100);
+    const top = d === result.digit;
+    html += `<div class="bar-row">
+      <span class="bar-d${top?' top':''}">${d}</span>
+      <div class="bar-track"><div class="bar-fill${top?' top':''}" style="width:${pct}%"></div></div>
+      <span class="bar-pct${top?' top':''}">${pct}%</span>
+    </div>`;
+  }
+  el.innerHTML = html;
+}
+
+function setStatus(id, msg, type='') {
+  const el = $(id); if (!el) return;
+  el.className = 'status' + (type ? ' '+type : '');
+  el.innerHTML = msg;
+}
+
+function showOverlay(id, type, symbol) {
+  const el = $(id); if (!el) return;
+  el.className = 'result-overlay show ' + type;
+  el.textContent = symbol;
+  setTimeout(() => el.classList.remove('show'), 1200);
+}
+
+// ── 히스토리 저장 ────────────────────────────────────────────────────
+async function addHistory(entry) {
+  history.unshift(entry);
+  if (history.length > 200) history = history.slice(0, 200);
+  await window.api.saveHistory(history);
+}
+
+// ── TAB 1: 인식 ────────────────────────────────────────────────────
+$('btn-r-clear').onclick = () => {
+  canvasR.clear();
+  $('result-r-num').textContent = '—';
+  $('result-r-conf').textContent = '';
+  $('result-r-bars').innerHTML = '';
+  setStatus('status-r', '숫자를 그린 후 [인식하기]를 누르세요.');
+};
+
+$('btn-r-recognize').onclick = async () => {
+  const btn = $('btn-r-recognize');
+  btn.disabled = true;
+  setStatus('status-r', '<span class="spinner"></span>분석 중...', 'loading');
+  $('result-r-num').textContent = '...';
+  $('result-r-conf').textContent = '';
+  $('result-r-bars').innerHTML = '';
+  try {
+    const res = await recognize(canvasR.getBase64());
+    if (res.digit === -1) {
+      $('result-r-num').textContent = '?';
+      setStatus('status-r', '숫자를 인식하지 못했습니다. 더 크게 그려보세요.');
+    } else {
+      $('result-r-num').textContent = res.digit;
+      $('result-r-conf').textContent = '신뢰도 ' + Math.round(res.confidence*100) + '%';
+      renderBars('result-r-bars', res);
+      setStatus('status-r', '인식 완료!', 'ok');
+      showOverlay('overlay-r', 'correct', res.digit);
+      await addHistory({ type: 'single', digit: res.digit, confidence: res.confidence, time: new Date().toISOString() });
+    }
+  } catch(e) {
+    $('result-r-num').textContent = '—';
+    setStatus('status-r', '오류: ' + e.message, 'error');
+  } finally { btn.disabled = false; }
+};
+
+// ── TAB 2: 연속 인식 ────────────────────────────────────────────────
+let seqDigits = [];
+
+function renderSeq() {
+  const display = $('seq-display');
+  const digitsEl = $('seq-digits');
+  if (seqDigits.length === 0) {
+    display.textContent = '아직 없음';
+    display.className = 'seq-number empty';
+    digitsEl.innerHTML = '';
+    return;
+  }
+  display.textContent = seqDigits.map(d => d.digit).join('');
+  display.className = 'seq-number';
+  digitsEl.innerHTML = seqDigits.map((d,i) =>
+    `<div class="seq-digit">
+       ${d.digit}
+       <span class="conf-badge">${Math.round(d.confidence*100)}%</span>
+       <button class="del-btn" onclick="removeSeqDigit(${i})">×</button>
+     </div>`
+  ).join('');
+}
+window.removeSeqDigit = (i) => { seqDigits.splice(i,1); renderSeq(); };
+
+$('btn-s-clear-canvas').onclick = () => { canvasS.clear(); setStatus('status-s','숫자를 그리고 [추가하기]를 누르세요.'); };
+$('btn-s-reset').onclick = () => { seqDigits=[]; renderSeq(); canvasS.clear(); setStatus('status-s','초기화 완료.'); };
+
+$('btn-s-add').onclick = async () => {
+  const btn = $('btn-s-add');
+  btn.disabled = true;
+  setStatus('status-s','<span class="spinner"></span>인식 중...','loading');
+  try {
+    const res = await recognize(canvasS.getBase64());
+    if (res.digit === -1) {
+      setStatus('status-s','인식 실패. 다시 그려보세요.','error');
+    } else {
+      seqDigits.push({ digit: res.digit, confidence: res.confidence });
+      renderSeq();
+      $('result-s-num').textContent = res.digit;
+      $('result-s-conf').textContent = '신뢰도 ' + Math.round(res.confidence*100) + '%';
+      setStatus('status-s', `"${res.digit}" 추가됨 — 다음 숫자를 그리세요.`,'ok');
+      canvasS.clear();
+    }
+  } catch(e) {
+    setStatus('status-s','오류: '+e.message,'error');
+  } finally { btn.disabled = false; }
+};
+
+$('btn-s-save').onclick = async () => {
+  if (seqDigits.length === 0) return;
+  await addHistory({
+    type: 'sequence',
+    value: seqDigits.map(d=>d.digit).join(''),
+    digits: seqDigits,
+    time: new Date().toISOString()
+  });
+  setStatus('status-s','기록에 저장됨!','ok');
+};
+
+// ── TAB 3: 테스트 모드 ───────────────────────────────────────────────
+let testState = { q:0, correct:0, wrong:0, target:-1, active:false };
+const TOTAL_Q = 10;
+
+function startTest() {
+  testState = { q:0, correct:0, wrong:0, target:-1, active:true };
+  $('test-idle').style.display = 'none';
+  $('test-done').style.display = 'none';
+  $('test-active').style.display = 'block';
+  nextQuestion();
+}
+
+function nextQuestion() {
+  if (testState.q >= TOTAL_Q) { endTest(); return; }
+  testState.target = Math.floor(Math.random()*10);
+  $('test-target-num').textContent = testState.target;
+  $('test-q').textContent = testState.q + 1;
+  updateTestScore();
+  canvasT.clear();
+  $('result-t-num').textContent = '—';
+  $('result-t-conf').textContent = '';
+  $('result-t-bars').innerHTML = '';
+  setStatus('status-t', `${testState.q+1}/${TOTAL_Q} — "${testState.target}"을(를) 그려주세요.`);
+}
+
+function updateTestScore() {
+  $('test-correct').textContent = testState.correct;
+  $('test-wrong').textContent   = testState.wrong;
+  const done = testState.correct + testState.wrong;
+  $('test-pct').textContent = done > 0 ? Math.round(testState.correct/done*100)+'%' : '—';
+  $('test-progress').style.width = (testState.q/TOTAL_Q*100)+'%';
+}
+
+function endTest() {
+  const pct = Math.round(testState.correct/TOTAL_Q*100);
+  $('test-active').style.display = 'none';
+  $('test-done').style.display   = 'block';
+  $('final-score-num').textContent = pct + '%';
+  $('final-score-sub').textContent = `${testState.correct}개 정답 / ${TOTAL_Q}문제`;
+  const grade = pct >= 90?'완벽합니다! 🎉':pct>=70?'잘 하셨어요! 👍':pct>=50?'보통이에요 🙂':'조금 더 연습해보세요 😊';
+  $('final-score-detail').textContent = grade;
+  addHistory({ type:'test', score:pct, correct:testState.correct, total:TOTAL_Q, time:new Date().toISOString() });
+}
+
+$('btn-test-start').onclick = startTest;
+$('btn-test-again').onclick = () => { $('test-done').style.display='none'; startTest(); };
+$('btn-t-stop').onclick = () => { $('test-active').style.display='none'; $('test-idle').style.display='block'; };
+$('btn-t-clear').onclick = () => { canvasT.clear(); };
+
+$('btn-t-check').onclick = async () => {
+  const btn = $('btn-t-check');
+  btn.disabled = true;
+  setStatus('status-t','<span class="spinner"></span>인식 중...','loading');
+  try {
+    const res = await recognize(canvasT.getBase64());
+    if (res.digit === -1) {
+      setStatus('status-t','인식 실패. 다시 그려보세요.','error');
+      btn.disabled = false; return;
+    }
+    $('result-t-num').textContent = res.digit;
+    $('result-t-conf').textContent = '신뢰도 ' + Math.round(res.confidence*100) + '%';
+    renderBars('result-t-bars', res);
+
+    const isCorrect = res.digit === testState.target;
+    if (isCorrect) {
+      testState.correct++;
+      showOverlay('overlay-t','correct','✓');
+      setStatus('status-t','정답!','ok');
+    } else {
+      testState.wrong++;
+      showOverlay('overlay-t','wrong','✗');
+      setStatus('status-t',`오답 — AI는 "${res.digit}"로 인식 (정답: ${testState.target})`,'error');
+    }
+    testState.q++;
+    updateTestScore();
+    setTimeout(() => { btn.disabled = false; nextQuestion(); }, 1400);
+  } catch(e) {
+    setStatus('status-t','오류: '+e.message,'error');
+    btn.disabled = false;
+  }
+};
+
+// ── TAB 4: 기록 ─────────────────────────────────────────────────────
+function renderHistory() {
+  const body = $('history-body');
+  const statsEl = $('history-stats');
+
+  if (history.length === 0) {
+    statsEl.innerHTML = '';
+    body.innerHTML = '<div class="empty-state">아직 기록이 없습니다.</div>';
+    return;
+  }
+
+  const singles  = history.filter(h => h.type==='single').length;
+  const seqCount = history.filter(h => h.type==='sequence').length;
+  const tests    = history.filter(h => h.type==='test');
+  const avgScore = tests.length ? Math.round(tests.reduce((a,t)=>a+t.score,0)/tests.length) : null;
+
+  statsEl.innerHTML = `
+    <div class="stat-card"><div class="val">${singles}</div><div class="lbl">단일 인식</div></div>
+    <div class="stat-card"><div class="val">${seqCount}</div><div class="lbl">연속 인식</div></div>
+    <div class="stat-card"><div class="val">${tests.length}</div><div class="lbl">테스트</div></div>
+    ${avgScore!==null?`<div class="stat-card"><div class="val">${avgScore}%</div><div class="lbl">평균 점수</div></div>`:''}
+  `;
+
+  let rows = history.map(h => {
+    const t = new Date(h.time);
+    const timeStr = t.toLocaleDateString('ko-KR')+ ' ' + t.toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
+    if (h.type === 'single') {
+      return `<tr>
+        <td class="digit-cell">${h.digit}</td>
+        <td><span class="badge normal">단일</span></td>
+        <td>${Math.round(h.confidence*100)}%</td>
+        <td>${timeStr}</td>
+      </tr>`;
+    } else if (h.type === 'sequence') {
+      return `<tr>
+        <td style="font-size:18px;font-weight:300;color:var(--accent)">${h.value}</td>
+        <td><span class="badge normal">연속</span></td>
+        <td>${h.digits.length}자리</td>
+        <td>${timeStr}</td>
+      </tr>`;
+    } else if (h.type === 'test') {
+      const ok = h.score >= 70;
+      return `<tr>
+        <td style="font-size:18px;font-weight:300;color:var(--accent)">${h.score}%</td>
+        <td><span class="badge normal">테스트</span></td>
+        <td><span class="badge ${ok?'correct':'wrong'}">${h.correct}/${h.total} 정답</span></td>
+        <td>${timeStr}</td>
+      </tr>`;
+    }
+  }).join('');
+
+  body.innerHTML = `
+    <table class="history-table">
+      <thead><tr><th>결과</th><th>종류</th><th>상세</th><th>시간</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+$('btn-clear-history').onclick = async () => {
+  if (!confirm('모든 기록을 삭제할까요?')) return;
+  history = [];
+  await window.api.clearHistory();
+  renderHistory();
+};
+
+// ── TAB 5: 설정 ─────────────────────────────────────────────────────
+$('btn-save-key').onclick = async () => {
+  const val = $('input-api-key').value.trim();
+  if (!val) return;
+  apiKey = val;
+  await window.api.saveApiKey(val);
+  const saved = $('settings-saved');
+  saved.classList.add('show');
+  setTimeout(() => saved.classList.remove('show'), 2000);
+};
+
+// ── 초기 로드 ───────────────────────────────────────────────────────
+(async () => {
+  apiKey  = await window.api.getApiKey();
+  history = await window.api.getHistory();
+  if (!apiKey) {
+    // API 키 없으면 설정 탭으로
+    document.querySelector('[data-tab="settings"]').click();
+  }
+})();
+</script>
+</body>
+</html>
